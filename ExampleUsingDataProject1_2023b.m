@@ -1,6 +1,6 @@
 
 
-
+%s
 % ---------------------------------------------------------------------------------
 function Main()
 
@@ -20,6 +20,7 @@ end
 % ----------------------------------------
 
 function ExploreData(data)
+plot_envirnment = InitCertainPartOfMyProgram(data); %figure 11 -background 
 
 %new- proj2
 sv = 0.01;          %Speed measurements: standard deviation: 10cm/second.
@@ -33,7 +34,6 @@ Pu  = [ [ sv^2 ,    0  ];
       ];            
 
 
-hh=InitCertainPartOfMyProgram(data);
 ne     = data.n;                % how many events?
 EventsList  = data.table;            % table of events.
 event0 = EventsList(:,1);            % first event.
@@ -42,8 +42,11 @@ vw=[0;0];  % Program variable to keep last [speed (aka "longitudinal velocify"),
 XX=zeros(3,ne,'single');     % A buffer for recording my results (estimated poses).  size=3 x ne.
 Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and orientation, ..
 
+list_of_ooi=[]; 
+global_pos_OOI1 =[];
+list_of_ooi=zeros(80,2);
 
-    for i=1:ne,
+    for i=1:ne
         
         XX(:,i)=Xe;  %record current pose; so, we can analyze the estimated trajectory after the loop ends.
         
@@ -59,8 +62,15 @@ Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and o
         %vw is the input at time k
         [Xe,P] = MyPredictionStepEKF(Xe,P,vw,dt,Pu); 
 
-
-
+            theta           = Xe(3);
+            %the UGV current pos, part_C:
+            % length of the arrow
+            L = 2;
+            % Calculate the x and y components of the arrow
+            u = L*cos(theta);
+            v = L*sin(theta);
+            %plot the ugv dynamicly with a arrow sticking out:
+            set(plot_envirnment(5),'xdata',Xe(1),'ydata',Xe(2),'UData',u,'VData',v);
     
         
         index = event(2);  % where to read the actual measurement, from that sensor recorder.
@@ -68,14 +78,21 @@ Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and o
         switch sensorID    % measurement is from which sensor?
             
             case 1  %  it is a scan from  LiDAR#1, and scan from LiDAR#2! (both, as they are synchronized)
-            fprintf('Event (LiDAR), dt=[%.1fms], at t=[%.3f]\n',dt*1000,tNow);   % print some info, for debugging our code.
+            %fprintf('Event (LiDAR), dt=[%.1fms], at t=[%.3f]\n',dt*1000,tNow);   % print some info, for debugging our code.
             
             % both LiDARs are synchronized.
             scan1 = data.scans(:,index);  
             
             % do something with the data.
-            
-             [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg);  
+              
+
+
+        
+            global_pos_OOI1 = [global_pos_OOI1; local_to_globalk(scan1, Xe ,Lidar1Cfg)];
+            list_of_ooi =detected_OOIs_center(global_pos_OOI1);
+           
+             [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,data.Context.Landmarks,list_of_ooi);  
+               
  
             
             pause(0.05);
@@ -142,7 +159,7 @@ end
 
 % ---------------------------------------------------------------------------------
 
-function [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,landmarks);  
+function [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,landmarks,list_of_ooi)  
 
    
     mask1 = 16383;   %  0xFFF7 % extract lowest 14 bits (actual ranges, in cm).
@@ -150,18 +167,29 @@ function [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,landmarks);
     ranges = bitand(scan1, mask1);        % in cms, uint16
     ranges = single(ranges)*0.01 ;       % now in meters, single precision.
     colors = bitand(scan1,mask2);
+    %global_pos_OOI1= zeros(80,2);
+
+
+
     
+    %[nOOIs, list_of_oois] = Detect_OOIs(scan1);
+    %if (nOOIs<1), return; end;
+
     
-    [nOOIs, list_of_oois] = Detect_OOIs(scan1);
-    if (nOOIs<1), return; end;
+    %disp(global_pos_OOI1);
+    %list_of_ooi =detected_OOIs_center(global_pos_OOI1);
+    %disp(size(list_of_ooi));
+
+
+       
     
-    
-    [nDA, ii_ooi, ii_lm] = DA(list_of_oois,Xe,Lidar1Cfg,landmarks); %tell me waht ooi I tell you what landmark, here is indexes returned.
+    [nDA, ii_ooi, ii_lm] = DA(landmarks,list_of_ooi); %tell me waht ooi I tell you what landmark, here is indexes returned.
     %nDA = number of DA succesfull
-    if (ndA<1), return; end;
+    %if (ndA<1), return; end;
+    %disp(list_of_ooi(2));
     
     for i = 1 : nDA
-        [Xe,P ] = Do_update_OOI (Xe,P, list_of_oois(:,ii_ooi(i)), landmarks(:,ii_lm(i)),Lidar1Cfg,ranges );
+        %[Xe,P] = Do_update_OOI (Xe,P, list_of_ooi(:,ii_ooi(i)), landmarks(:,ii_lm(i)) , Lidar1Cfg,ranges );
     
     end
 
@@ -192,12 +220,16 @@ function h = CreateFigureToShowScansInPolar()
     h2 = plot(aa,r,'.b'); 
     title('LiDAR2(shown in Polar)');  xlabel('angle (degrees)');  ylabel('range (m)'); axis([-75,75,0,20]); grid on;
     hold on;  h2b = plot(0,0,'r+');
-    h = [h1,h1b,h2,h2b];
+
+    figure(11);hold on;
+    h3 = quiver(0,0,'O','LineWidth', 2,'MaxHeadSize', 0.5,'MarkerSize',15,'MarkerFaceColor','r','MarkerEdgeColor','k');
+
+
+
+    h = [h1,h1b,h2,h2b,h3];
 end    
     
 %--------------------------------------------------------------------------
-
-
 function [Xe,P] = MyPredictionStepEKF(Xe,P,vw,dt,Pu)
 
     J = JacobianX(Xe,vw,dt);
@@ -260,8 +292,6 @@ function  [Xe,P ] = Do_update_OOI (Xe,P, OOI, landmark,Lidar1Cfg, ranges )
 end
 
 %--------------------------------------------------------------------------
-
-
 function H  = find_H (Xe,P, OOI, landmark,Lidar1Cfg )
 x_car = Xe(1);
 y_car = Xe(2);
@@ -286,10 +316,17 @@ H =[ [ (xk - x)/((x - xk)^2 + (y - yk)^2)^(1/2)   ,  (yk - y)/((x - xk)^2 + (y -
 
 end
 
-
-
 %--------------------------------------------------------------------------
-
+function [x,y] = Ranges_in_cartesian_LiDaR_CF(scan)   %used in two fuctions above, returns pos of dots in cartesan local CF
+    mask1  = 16383;  
+    ranges = single(bitand(scan,mask1))*0.01; 
+    angles = [-75:0.5:75]';
+    angles = deg2rad(angles);
+    % Convert to Cartesian coordinates using the LiDAR's geometry
+    x = ranges .* cos(angles);
+    y = ranges .* sin(angles);
+end
+%--------------------------------------------------------------------------
 function [nOOIs,ooi_positions] = Detect_OOIs(scan) %OOIs in cartesian LiDaR-CF
     % Constants
     mask2 = 49152; % 1100000000000000
@@ -347,34 +384,100 @@ function [nOOIs,ooi_positions] = Detect_OOIs(scan) %OOIs in cartesian LiDaR-CF
 end
     
 %--------------------------------------------------------------------------
-function [x,y] = Ranges_in_cartesian_LiDaR_CF(scan1)   %used in two fuctions above, returns pos of dots in cartesan local CF
-    mask1  = 16383;  
-    ranges = single(bitand(scan1,mask1))*0.01; 
-    angles = [-75:0.5:75]';
-    angles = deg2rad(angles);
-    % Convert to Cartesian coordinates using the LiDAR's geometry
-    x = ranges .* cos(angles);
-    y = ranges .* sin(angles);
+function [OOI_global_pos] = local_to_globalk(scan, Xe,LidarCfg) 
+    %the heading of the vehicle:
+    theta = Xe(3);
+    % lidar position in GCF (assuming scalar):
+    x_origin = Xe(1); 
+    y_origin = Xe(2); 
+    %Lidar pos in UGV:
+    lx = LidarCfg.Lx;
+    ly = LidarCfg.Ly;
+    alpha = LidarCfg.Alpha;
+    %the rotation matrix LiDar to UVG:
+    R_LiDaR= [cos(alpha) -sin(alpha);
+              sin(alpha) cos(alpha)];
+    %the rotation matrix UVG to Global:
+    R = [cos(theta) -sin(theta);
+        sin(theta) cos(theta)];
+    % now get the OOI in local LiDaR_CF using detect_ooi function
+    [nOOIs,ooi_positions] = Detect_OOIs(scan);  %return OOI_pos in cartesian local LiDaR_CF 
+    % loop over detected OOIs and find the these Points in UVG_CF
+    OOI_p_local = zeros(size(ooi_positions, 1),2);
+    for i = 1:size(ooi_positions, 1)
+        OOI_p_local(i,:) = R_LiDaR * [ooi_positions(i, 1),ooi_positions(i, 2)]' +[lx;ly]; % x_v pos of ooi in vehicle CF
+    end
+     % Find the global position of the OOI
+     OOI_global_pos = R * OOI_p_local' + [x_origin;y_origin ];
+     OOI_global_pos = OOI_global_pos'; %//was wrong dim. global pos give n*1 while shoud be n*2
 end
-
 %--------------------------------------------------------------------------
-[nDA, ii_ooi, ii_lm] = DA(list_of_oois,Xe,Lidar1Cfg,landmarks); %tell me waht ooi I tell you what landmark, here is indexes returned.
-    %nDA = number of DA succesfull
+function [OOIs_center] = detected_OOIs_center(OOI_global_pos) %in GCF
+    
+     %----First I need to rearrange the OOI_global_pos such that the closest points are in sequence:
+    % Compute pairwise distances between points
+    distances = pdist2(OOI_global_pos, OOI_global_pos);
+    % Sort distances and get corresponding indices
+    [sortedDistances, sortedIndices] = sortrows(distances);
+    % Rearrange points according to sorted indices
+    OOI_global_pos_arranged = OOI_global_pos(sortedIndices, :);
 
-function [matchedPoints1, matchedPoints2] = DA(Landmarks,OOIs_center)
-%Here I will run through all OOIs_center and data.Context.Landmarks to
-%assosiate landmarkes with their corresponding detected OOI.
-% Compute pairwise distances between points from both sets
-%disp(size(OOIs_center));
-Landmarks = Landmarks';
-distances = pdist2(Landmarks, OOIs_center);
-% Set a threshold distance for matching points (between 0.5m and 1.5m)
-threshold = 1;
-% Find pairs of points whose distances are below the threshold
-[indices1, indices2] = find(distances <= threshold);
-% Extract the matched points from each set
-matchedPoints1 = Landmarks(indices1, :);
-matchedPoints2 = OOIs_center(indices2, :);
+    %---find the oois that represent the same landmark by taking the distance
+    %between them.
+    distances1 = zeros(size(OOI_global_pos_arranged, 1)-1, 1); 
+    for i = 1:size(OOI_global_pos_arranged, 1)-1 
+        distances1(i) = norm(OOI_global_pos_arranged(i+1,:) - OOI_global_pos_arranged(i,:));
+    end
+ 
+    index_array = [];
+    prev_index = 0; % Initialize previous index
+    %--- Loop through distances and find the indexes for where we have cut
+    for i = 1:length(distances1)
+        if distances1(i) > 1.5
+            % Add previous indexes and current index to index_array
+            index_array = [index_array, (prev_index+1):i];
+        end
+        % Update previous index
+        prev_index = i;
+    end
+    prev = 1;
+    OOIs_center_x=[];
+    OOIs_center_y=[];
+    %--Update the OOIs_center coordinates:
+    for i = 1:length(index_array)
+        j = index_array(i);
+        OOIs_center_x = [OOIs_center_x; mean(OOI_global_pos_arranged(prev:j,1))];
+        OOIs_center_y = [OOIs_center_y; mean(OOI_global_pos_arranged(prev:j,2))];
+        prev = j + 1;
+    end
+   OOIs_center = [OOIs_center_x,OOIs_center_y];
+end  
+%--------------------------------------------------------------------------
+function [nDA, ii_ooi, ii_lm] = DA(Landmarks,OOIs_center)
+
+    %input: data.Context.Landmarks,detected_OOIs_center(global_pos_OOI1)
+    nDA = 0;
+    %Here I will run through all OOIs_center and data.Context.Landmarks to
+    %assosiate landmarkes with their corresponding detected OOI.
+    % Compute pairwise distances between points from both sets
+    %disp(size(OOIs_center));
+    Landmarks = Landmarks';
+    distances = pdist2(Landmarks, OOIs_center);
+    % Set a threshold distance for matching points (between 0.5m and 1.5m)
+    threshold = 1;
+    % Find pairs of points whose distances are below the threshold
+    [indices1, indices2] = find(distances <= threshold);
+    ii_ooi= indices1;
+    ii_lm= indices2;
+    if (ii_ooi>0) 
+        nDA=length(ii_ooi);
+    end
+    % Extract the matched points from each set
+    %matchedPoints1 = Landmarks(indices1, :);
+    %matchedPoints2 = OOIs_center(indices2, :);
 
 
 end
+
+
+
