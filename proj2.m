@@ -94,7 +94,7 @@ global_pos_OOI1 =[];
                
  
             
-            pause(0.1);
+            pause(0.05);
             continue;  %"done, next event!"
             
             %...............................
@@ -246,14 +246,9 @@ end
 
 %--------------------------------------------------------------------------
 function X=MyKinematicModel(X,vw,dt)
-       %tun = 0;
-       %vw_tun = vw + tun;  %take the gyroscope values and correct it, been used in X(3)
-     % Here, you implement your discrete time model; e.g. using Euler's approach.
        X(1) = X(1) + vw(1) * cos(X(3)) * dt; % x=x0+v*dt
        X(2) = X(2) + vw(1) * sin(X(3)) * dt;
        X(3) = X(3) + vw(2) * dt;
-
-       %X(3) = X(3) + vw_tun(2) * dt;
 end   
 
 %--------------------------------------------------------------------------
@@ -278,7 +273,7 @@ function  [Xe,P ] = Do_update_OOI (Xe,P, OOI, landmark,Lidar1Cfg, ranges,colors,
     [H,h] =   find_H (Xe,P, OOI, landmark,Lidar1Cfg );
 
     %R = 0.25^2; 
-    R = [ [ 0.25^2 ,      0       ]    
+    R = [ [ 25^2 ,      0       ]    
           [   0    , (3*pi/180)^2 ]];  %remember 3 is in rad here
     
      %disp(OOI_ranges(scan));
@@ -287,22 +282,14 @@ function  [Xe,P ] = Do_update_OOI (Xe,P, OOI, landmark,Lidar1Cfg, ranges,colors,
         return;
     end
  
-
    %if (size(ym)> 0) % if I have a measurment, update..
-    
-    Z = ym- h;
-    
+    Z = [0;0];
+    Z(1) = ym- h;
 
-%     S = H * P * H' + R;
-%    
-%     K = P*H'*inv(S);
-%     
-%     Xe = Xe+K*Z;
-%     Xe = Xe(:,1);
-%    
-%     P = P-P*H'*inv(S)*H*P;
-
-  % end
+    S = H * P * H' + R;
+    K = P*H'*inv(S);
+    Xe = Xe + K * Z;
+    P = P-P*H'*inv(S)*H*P;
 
 end
 
@@ -312,9 +299,6 @@ x_car = Xe(1);
 y_car = Xe(2);
 phi = Xe(3);
 
-o = OOI(end,:);
-oix = o(1);
-oiy = (o(2));
 
 x = x_car + Lidar1Cfg.Lx*cos(phi);   % in GCF
 y = y_car + Lidar1Cfg.Lx*sin(phi);
@@ -326,29 +310,17 @@ xk = lm(1);    %should be the pos of centerOOI , fix it
 yk =lm(2);
 
 lm_prev = landmark(end-1,:);
-if (lm_prev(1) == lm(1))
-    k = 1
-    %return;
-end
 
-%disp('corrosp ooi ');
-%disp(OOI);
  h =   sqrt((xk-x)^2 + (yk-y)^2 );  % atan2(yk-y , xk-x) -phi   ];  %h2
 
-fprintf('x=%.2f, y=%.2f, lmx=%.2f, lmy=%.2f, h=%.2f,   \n', x, y, xk, yk, h);
+%fprintf('x=%.2f, y=%.2f, lmx=%.2f, lmy=%.2f, h=%.2f,   \n', x, y, xk, yk, h);
 
-
-
-%y_m = h;
 % 
 H =[ [ -(xk - x)/sqrt(((xk - x)^2 + (yk - y)^2))   ,  -(yk - y)/sqrt(((xk - x)^2 + (yk - y)^2)),0  ];
      [ (yk - y)/((xk - x)^2 + (yk - y)^2)         ,  -(xk - x)/((xk - x)^2 + (yk - y)^2)        ,0]
    ];
 
 %H =[ (x - xk) / sqrt((xk - x)^2 + (yk - y)^2), (y - yk) / sqrt((xk - x)^2 + (yk - y)^2)];
-
-
-
 
 end
 
@@ -505,6 +477,8 @@ function [success,matchedPoints1, matchedPoints2] = Data_assosiation(Landmarks,O
     % Extract the matched points from each set
     matchedPoints1 = Landmarks(indices1, :);
     matchedPoints2 = OOIs_center(indices2, :);
+
+    %disp(matchedPoints1);
 
     if (size(matchedPoints2) > 0)
         success = 1;
