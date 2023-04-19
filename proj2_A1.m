@@ -15,7 +15,11 @@ function ExploreData(data)
     AA=API_MTRN4010a(1);      % init API, JUST once
     BB=API_4010_verifyEKF(data); % Consistency plots
     
-    plot_envirnment = InitCertainPartOfMyProgram(data); %figure 11 -background 
+    %sparse maps: data.Context.Landmarks, data.Context.Landmarks2, data.Context.Landmarks4:
+    landmark_map = data.Context.Landmarks;
+
+
+    plot_envirnment = InitCertainPartOfMyProgram(data,landmark_map); %figure 11 -background 
     
     %new- proj2
     sv = 0.1;          %Speed measurements: standard deviation: 10cm/second.
@@ -75,7 +79,7 @@ function ExploreData(data)
                 
             scan1 = data.scans(:,index);  
            
-            [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,data.Context.Landmarks,AA,plot_envirnment(2));  
+            [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,landmark_map,AA,plot_envirnment(2));  
             BB.Rec(Xe,P);   % record 
             pause(0.01);
             continue;  %"done, next event!"
@@ -101,12 +105,12 @@ function ExploreData(data)
 end
 % --------------------------------------------------------------------------------
 
-function hh=InitCertainPartOfMyProgram(data)
+function hh=InitCertainPartOfMyProgram(data,landmark_map)
 
 figure(11); clf();    % global CF.
 
 
-Landmarks=data.Context.Landmarks;
+Landmarks=landmark_map;
 % plot centres of landmarks. 
 plot(Landmarks(1,:),Landmarks(2,:),'ko')
 
@@ -288,8 +292,8 @@ function OOIGCF = OOIs_from_local_to_global (props,Xe,Lidar1Cfg)
     theta = Xe(3);
 
     % lidar position in GCF (assuming scalar):
-    x_origin = Xe(1); 
-    y_origin = Xe(2); 
+    x_origin = Xe(1)+ Lidar1Cfg.Lx *cos(theta) ;
+    y_origin = Xe(2) + Lidar1Cfg.Lx * sin(theta);
     %Lidar pos in UGV:
     lx = Lidar1Cfg.Lx;
     ly = Lidar1Cfg.Ly;
@@ -307,7 +311,7 @@ function OOIGCF = OOIs_from_local_to_global (props,Xe,Lidar1Cfg)
     % loop over detected OOIs and find the these Points in UVG_CF
     OOI_p_local = zeros(size(ooi_positions, 1),2);
     for i = 1:size(ooi_positions, 1)
-        OOI_p_local(i,:) = R_LiDaR * [ooi_positions(i, 1),ooi_positions(i, 2)]' +[lx;ly]; % x_v pos of ooi in vehicle CF
+        OOI_p_local(i,:) = R_LiDaR * [ooi_positions(i, 1),ooi_positions(i, 2)]' -[lx;ly]; % x_v pos of ooi in vehicle CF
     end
      % Find the global position of the OOI
      OOI_global_pos = R * OOI_p_local' + [x_origin;y_origin ];
