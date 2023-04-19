@@ -1,6 +1,5 @@
 
-
-%s
+% Project 2 part A1 by Abdulrahman Nabil Akkawi z5444959
 % ---------------------------------------------------------------------------------
 function Main()
 
@@ -13,35 +12,33 @@ end
 % ----------------------------------------
 
 function ExploreData(data)
-AA=API_MTRN4010a(1);      % init API, JUST once
-BB=API_4010_verifyEKF(data);
-
-plot_envirnment = InitCertainPartOfMyProgram(data); %figure 11 -background 
-
-%new- proj2
-sv = 0.1;          %Speed measurements: standard deviation: 10cm/second.
-sw = deg2rad(4) ;%0.069813;             %Gyroscope measurements: standard deviation: 4 deg/s = 0.069813 rad/s
-
-Xe = data.pose0;  
-P  = zeros(3,3);       %covariance matrix of the state
-
-Pu  = [ [ sv^2 ,    0  ];   %covariance matrix of input
-        [ 0    ,  sw^2 ]
-      ];            
-
-
-ne     = data.n;                % how many events?
-EventsList  = data.table;            % table of events.
-event0 = EventsList(:,1);            % first event.
-t0=event0(1) ; t0=0.0001*double(t0); % initial time (the time of event0).
-vw=[0;0];  % Program variable to keep last [speed (aka "longitudinal velocify"),heading rate] measurement.
-XX=zeros(3,ne,'single');     % A buffer for recording my results (estimated poses).  size=3 x ne.
-Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and orientation, ..
-
-X_truck = zeros(2,ne);
-
+    AA=API_MTRN4010a(1);      % init API, JUST once
+    BB=API_4010_verifyEKF(data); % Consistency plots
+    
+    plot_envirnment = InitCertainPartOfMyProgram(data); %figure 11 -background 
+    
+    %new- proj2
+    sv = 0.1;          %Speed measurements: standard deviation: 10cm/second.
+    sw = deg2rad(4) ;%0.069813;             %Gyroscope measurements: standard deviation: 4 deg/s = 0.069813 rad/s
+    
+    Xe = data.pose0;  
+    P  = zeros(3,3);       %covariance matrix of the state
+    
+    Pu  = [ [ sv^2 ,    0  ];   %covariance matrix of input
+            [ 0    ,  sw^2 ] ];            
+    
+    
+    ne     = data.n;                % how many events?
+    EventsList  = data.table;            % table of events.
+    event0 = EventsList(:,1);            % first event.
+    t0=event0(1) ; t0=0.0001*double(t0); % initial time (the time of event0).
+    vw=[0;0];  % Program variable to keep last [speed (aka "longitudinal velocify"),heading rate] measurement.
+    XX=zeros(3,ne,'single');     % A buffer for recording my results (estimated poses).  size=3 x ne.
+    Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and orientation, ..
+    
+    X_truck = zeros(2,ne);
+    
     for i=1:ne
-        
         
         event   = EventsList(:,i);        %event #i                    
         sensorID=event(3);                          % source (i.e. which sensor generated this event?)
@@ -54,28 +51,28 @@ X_truck = zeros(2,ne);
         %X=MyKinematicModel(X,vw,dt);
 
         [Xe,P] = MyPredictionStepEKF(Xe,P,vw,dt,Pu);
-
-
-        %X_truck for the finale plot
-             X_truck(1,i)  = Xe(1);
-             X_truck(2,i)  = Xe(2);
-             theta           = Xe(3);
-            %the UGV current pos, part_C:
-            % length of the arrow
-            L = 1.5;
-            % Calculate the x and y components of the arrow
-            u = L*cos(theta);
-            v = L*sin(theta);
-            %plot the ugv dynamicly with a arrow sticking out:
-            set(plot_envirnment(1),'xdata',Xe(1),'ydata',Xe(2),'UData',u,'VData',v);
     
+    
+        %X_truck for the finale plot
+         X_truck(1,i)  = Xe(1);
+         X_truck(2,i)  = Xe(2);
+         theta           = Xe(3);
+        %the UGV current pos, part_C:
+        % length of the arrow
+        L = 1.5;
+        % Calculate the x and y components of the arrow
+        u = L*cos(theta);
+        v = L*sin(theta);
+        %plot the ugv dynamicly with a arrow sticking out:
+        set(plot_envirnment(1),'xdata',Xe(1),'ydata',Xe(2),'UData',u,'VData',v);
         
+            
         index = event(2);  % where to read the actual measurement, from that sensor recorder.
             
         switch sensorID    % measurement is from which sensor?
             
             case 1  %  it is a scan from  LiDAR#1, and scan from LiDAR#2! (both, as they are synchronized)
-            
+                
             scan1 = data.scans(:,index);  
            
             [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,data.Context.Landmarks,AA,plot_envirnment(2));  
@@ -86,7 +83,7 @@ X_truck = zeros(2,ne);
             %...............................
             case 2  %  It is speed encoder + gyro  (they are packed together, synchonized readings)
             vw=data.vw(:,index);    % speed and gyroZ, last updated copy.
-    
+        
             continue;  %"next!" (go to process next even, inmmediately)
             
             otherwise  % It may happen, if the dataset contains measurements from sensors 
@@ -94,12 +91,12 @@ X_truck = zeros(2,ne);
             continue;
         end;
     end;       % end loop, reading chronologically sensors' events.
-% .....................................................
-BB.Show(10,'Consistency plots');
-disp('Loop of events ends.');
-
-disp('Showing ground truth (your estimated trajectory should be close).)');
-ShowVerification1(data,X_truck);  
+    % .....................................................
+    BB.Show(10,'Consistency plots');
+    disp('Loop of events ends.');
+    
+    disp('Showing ground truth (your estimated trajectory should be close).)');
+    ShowVerification1(data,X_truck);  
 
 end
 % --------------------------------------------------------------------------------
