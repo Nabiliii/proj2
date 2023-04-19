@@ -14,6 +14,8 @@ end
 
 function ExploreData(data)
 AA=API_MTRN4010a(1);      % init API, JUST once
+BB=API_4010_verifyEKF(data);
+
 plot_envirnment = InitCertainPartOfMyProgram(data); %figure 11 -background 
 
 %new- proj2
@@ -60,7 +62,7 @@ X_truck = zeros(2,ne);
              theta           = Xe(3);
             %the UGV current pos, part_C:
             % length of the arrow
-            L = 2;
+            L = 1.5;
             % Calculate the x and y components of the arrow
             u = L*cos(theta);
             v = L*sin(theta);
@@ -77,7 +79,7 @@ X_truck = zeros(2,ne);
             scan1 = data.scans(:,index);  
            
             [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,data.Context.Landmarks,AA,plot_envirnment(2));  
-               
+            BB.Rec(Xe,P);   % record 
             pause(0.01);
             continue;  %"done, next event!"
             
@@ -93,7 +95,7 @@ X_truck = zeros(2,ne);
         end;
     end;       % end loop, reading chronologically sensors' events.
 % .....................................................
-
+BB.Show(10,'Consistency plots');
 disp('Loop of events ends.');
 
 disp('Showing ground truth (your estimated trajectory should be close).)');
@@ -191,7 +193,7 @@ end
 function h = CreateFigureToShowScansInPolar()
     
     figure(11);axis([-5,20,-5,25]);hold on;
-    h1 = quiver(0,0,'O','LineWidth', 2,'MaxHeadSize', 0.5,'MarkerSize',15,'MarkerFaceColor','r','MarkerEdgeColor','k');
+    h1 = quiver(0,0,'O','LineWidth', 2,'MaxHeadSize', 0.5,'MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k');
     hold on;
     h2 = plot(0,0,'r*','markersize',3);                   %ooi_center dynamicly lidar1 %16
 
