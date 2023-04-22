@@ -3,22 +3,21 @@
 % ---------------------------------------------------------------------------------
 function Main()
 
-file='DataUsr_007k.mat';  
-load(file); 
-
-ExploreData(data);
-end
-
-% ----------------------------------------
-
-function ExploreData(data)
-    AA=API_MTRN4010a(1);      % init API, JUST once
-    BB=API_4010_verifyEKF(data); % Consistency plots
+    file='DataUsr_007k.mat';  
+    load(file); 
     
     %sparse maps: data.Context.Landmarks, data.Context.Landmarks2, data.Context.Landmarks4:
     landmark_map = data.Context.Landmarks;
 
+    ExploreData(data,landmark_map);
+end
 
+% ----------------------------------------
+
+function ExploreData(data,landmark_map)
+    AA=API_MTRN4010a(1);      % init API, JUST once
+    BB=API_4010_verifyEKF(data); % Consistency plots
+ 
     plot_envirnment = InitCertainPartOfMyProgram(data,landmark_map); %figure 11 -background 
     
     %new- proj2
@@ -32,35 +31,34 @@ function ExploreData(data)
             [ 0    ,  sw^2 ] ];            
     
     
-    ne     = data.n;                % how many events?
-    EventsList  = data.table;            % table of events.
-    event0 = EventsList(:,1);            % first event.
-    t0=event0(1) ; t0=0.0001*double(t0); % initial time (the time of event0).
-    vw=[0;0];  % Program variable to keep last [speed (aka "longitudinal velocify"),heading rate] measurement.
-    XX=zeros(3,ne,'single');     % A buffer for recording my results (estimated poses).  size=3 x ne.
-    Lidar1Cfg=data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and orientation, ..
+    ne              = data.n;                % how many events?
+    EventsList      = data.table;            % table of events.
+    event0          = EventsList(:,1);            % first event.
+    t0              =event0(1) ; 
+    t0              =0.0001*double(t0); % initial time (the time of event0).
+    vw              =[0;0];  % Program variable to keep last [speed (aka "longitudinal velocify"),heading rate] measurement.
+    Lidar1Cfg       =data.LidarsCfg.Lidar1;  %Info about LiDAR installation (position and orientation, ..
     
-    X_truck = zeros(2,ne);
+    X_truck         = zeros(2,ne);
     
     for i=1:ne
-        
-        event   = EventsList(:,i);        %event #i                    
-        sensorID=event(3);                          % source (i.e. which sensor generated this event?)
-        tNow=0.0001*double(event(1));               % when was this measurement taken?
+        event     = EventsList(:,i);        %event #i                    
+        sensorID  =event(3);                          % source (i.e. which sensor generated this event?)
+        tNow      =0.0001*double(event(1));               % when was this measurement taken?
         % Time in tNow is expressed in seconds.
-        dt=tNow-t0;    % dt since last event ( "dt" is needed for prediction steps).
-        t0=tNow ;      % remember current time, so we can calculate dt in next iteration.            
+        dt        =tNow-t0;    % dt since last event ( "dt" is needed for prediction steps).
+        t0        =tNow ;      % remember current time, so we can calculate dt in next iteration.            
         
       
         %X=MyKinematicModel(X,vw,dt);
 
-        [Xe,P] = MyPredictionStepEKF(Xe,P,vw,dt,Pu);
+        [Xe,P]    = MyPredictionStepEKF(Xe,P,vw,dt,Pu);
     
     
         %X_truck for the finale plot
          X_truck(1,i)  = Xe(1);
          X_truck(2,i)  = Xe(2);
-         theta           = Xe(3);
+         theta         = Xe(3);
         %the UGV current pos, part_C:
         % length of the arrow
         L = 1.5;
@@ -81,7 +79,7 @@ function ExploreData(data)
            
             [Xe,P] = processLiDAR(Xe,P, scan1,Lidar1Cfg,landmark_map,AA,plot_envirnment(2));  
             BB.Rec(Xe,P);   % record 
-            pause(0.01);
+            pause(0.05);
             continue;  %"done, next event!"
             
             %...............................
@@ -192,8 +190,12 @@ end
 % ---------------------------------------------------------------------------------
 
 function h = CreateFigureToShowScansInPolar()
-    
-    figure(11);axis([-5,20,-5,25]);hold on;
+  
+
+    figure(11);
+    hold on;
+    movegui(gcf, [80 230]);    
+    axis([-5,20,-5,25]);hold on;
     h1 = quiver(0,0,'O','LineWidth', 2,'MaxHeadSize', 0.5,'MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k');
     hold on;
     h2 = plot(0,0,'r*','markersize',3);                   %ooi_center dynamicly lidar1 %16
